@@ -1,22 +1,9 @@
 const { S3Client, GetObjectCommand } = require("@aws-sdk/client-s3");
 const { DynamoDBClient, ScanCommand } = require("@aws-sdk/client-dynamodb");
+const db = require('../Database/index');
 
 const client_s3 = new S3Client({ region: "sa-east-1" });
 const client_db = new DynamoDBClient({ region: "sa-east-1" });
-
-const dbItemToObject = (Item) => {
-    result = {
-        'id': parseInt(Item['id']['N']),
-        'Nombre': Item['Nombre']['S'],
-        'Categoria': Item['Categoria']['S'],
-        'Precio': parseInt(Item['Precio']['N']),
-        'Color': Item['Color']['S'],
-        'Imagen': Item['imagen']['S'],
-        'Descripcion': Item['Descripcion']['S']
-    }
-
-    return result
-}
 
 const GetImg = async (object) => {
     const input_s3 = {
@@ -52,29 +39,17 @@ const GetImg = async (object) => {
 }
 
 exports.GetProducts = async (req, res) => {
-    const input_db = {
-        "TableName": "Productos"
-      };
+    const query = 'SELECT * FROM Productos';
 
-    const command_db = new ScanCommand(input_db);
-
-    try {
-        const response_db = await client_db.send(command_db);
-        let res_db = response_db['Items'];
-        
-        for(let i = 0; i < res_db.length; i++){
-            res_db[i] = dbItemToObject(res_db[i]);
-            await GetImg(res_db[i])
+    db.query(query, async (err, results) => {
+        if (err) {
+          console.error('Error en la consulta:', err);
+          return res.status(500).json({ error: 'Error en la consulta' });
+        }
+        for(let i = 0; i < results.length; i++){
+            await GetImg(results[i])
         }
 
-        res.json(res_db)
-        
-    } catch (err) {
-        console.error(err);
-        res.status(500).send("Error fetching image from S3");
-    }
-};
-
-exports.GetProduct = async (req, res) => {
-
+        res.json(results)
+      });
 };
